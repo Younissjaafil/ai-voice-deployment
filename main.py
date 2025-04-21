@@ -24,8 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 with safe_globals([XttsConfig, XttsAudioConfig, XttsArgs, BaseDatasetConfig]):
-    tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC", gpu=torch.cuda.is_available())
-    # tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2", gpu=torch.cuda.is_available())
+    tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2", gpu=torch.cuda.is_available())
 
 os.makedirs("voices", exist_ok=True)
 os.makedirs("outputs", exist_ok=True)

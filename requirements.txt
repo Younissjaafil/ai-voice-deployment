@@ -1,11 +1,21 @@
-numpy==1.22.0
-torch==2.2.0
-torchaudio==2.2.0
+# numpy==1.22.0
+# torch==2.2.0
+# torchaudio==2.2.0
+# TTS==0.17.2
+# transformers==4.35.2
+# gradio==3.44.4
+# pydub==0.25.1 
+# fastapi==0.104.1
+# uvicorn==0.23.2   
+# python-multipart
+# aiofiles
+# Base image provides torch and torchaudio
+# numpy==1.22.0 # <-- Strongly recommend removing this line unless absolutely necessary
 TTS==0.17.2
 transformers==4.35.2
-gradio==3.44.4
-pydub==0.25.1 
+gradio==3.44.4 # Keep only if serving a Gradio UI from this container
+pydub==0.25.1
 fastapi==0.104.1
-uvicorn==0.23.2   
+uvicorn[standard]==0.23.2 # Using [standard] includes performance extras
 python-multipart
 aiofiles

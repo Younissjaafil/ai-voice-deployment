@@ -1,48 +1,67 @@
-# Use the specified PyTorch base image
-FROM pytorch/pytorch:2.2.0-cuda11.8-cudnn8-runtime
+# Stage 1: Builder
+# Use the same base image, give this stage a name "builder"
+FROM pytorch/pytorch:2.2.0-cuda11.8-cudnn8-runtime AS builder
 
-WORKDIR /app
-COPY . .
+# Set working directory for this stage
+WORKDIR /install_stage
 
-# Set TTS_HOME environment variable to cache models inside the app directory
-# Or map this path to persistent storage on Runpod if preferred (e.g., /workspace/.tts_cache)
-ENV TTS_HOME=/app/.local/share/tts
-RUN mkdir -p $TTS_HOME
-
-# Install required system packages
-# (This part seemed okay in the log, keeping it)
+# Install build-time system dependencies needed for compiling Python packages
+# Only install build-essential and git here
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
-    libsndfile1 \
     git \
     build-essential \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# --- FIX APPLIED HERE ---
-# Install Python dependencies
-# 1. Removed explicit numpy==1.22.0 pin.
-# 2. Install TTS and other libraries *before* torch/torchaudio.
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir \
-    TTS==0.17.2 \
-    fastapi \
-    uvicorn \
-    pydub \
-    Pillow && \
-    # Install torch/torchaudio matching the base image *after* other deps
-    # This ensures compatibility with the base image's CUDA/CuDNN setup
-    pip install --no-cache-dir \
-    torch==2.2.0 \
-    torchaudio==2.2.0
+# Create a virtual environment in /opt/venv
+RUN python3 -m venv /opt/venv
+# Activate venv for subsequent RUN commands in this stage
+ENV PATH="/opt/venv/bin:$PATH"
 
-# --- Optional but Recommended for Runpod Reliability: Pre-download model ---
-# This increases image size significantly but prevents download issues/delays at runtime.
-# Use gpu=False if your build environment doesn't have a GPU.
-# Uncomment the following line to enable pre-downloading:
-# RUN python -c "from TTS.api import TTS; print('Downloading TTS model...'); TTS(model_name='tts_models/multilingual/multi-dataset/xtts_v2', gpu=False); print('Model download complete.')"
-# --------------------------------------------------------------------------
+# Upgrade pip and install wheel (good practice)
+RUN pip install --upgrade pip wheel
 
-EXPOSE 7860
+# Copy your requirements file into this stage
+COPY requirements.txt .
 
-# Command to run the application using Uvicorn (matches EXPOSE)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Install Python dependencies from requirements.txt into the virtual environment
+# IMPORTANT: Make sure requirements.txt lists FastAPI, Uvicorn, TTS, etc.,
+# but DOES NOT include 'torch' or 'pytorch' as it's already in the base image.
+RUN pip install --no-cache-dir -r requirements.txt
+
+# --- End of Builder Stage ---
+
+# Stage 2: Runtime
+# Start from the same clean base image
+FROM pytorch/pytorch:2.2.0-cuda11.8-cudnn8-runtime
+
+# Set the final working directory for the application
+WORKDIR /app
+
+# Install only essential RUNTIME system dependencies
+# No build-essential or git needed here anymore
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy the virtual environment (with installed packages) from the builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy your application code (main.py, etc.) into the final image
+COPY . .
+
+# Set environment variable for TTS model cache location
+# TTS library usually defaults to ~/.local/share/tts or respects XDG_DATA_HOME
+# Setting XDG_DATA_HOME ensures models are cached inside the container's /app/.local
+ENV XDG_DATA_HOME=/app/.local
+# Create the directory just in case the application expects it
+RUN mkdir -p /app/.local/share/tts
+
+# Activate the virtual environment for the final command by adding it to PATH
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Expose the port your FastAPI app runs on
+EXPOSE 8000
+
+# Define the command to run your application using the python from the venv
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

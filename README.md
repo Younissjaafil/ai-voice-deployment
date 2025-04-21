@@ -89,7 +89,7 @@ with safe_globals([XttsConfig, XttsAudioConfig, XttsArgs, BaseDatasetConfig]):
 To launch the server on `localhost:8000`:
 
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Replace `app:app` with your actual filename and FastAPI instance name.

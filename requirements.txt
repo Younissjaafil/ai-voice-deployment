@@ -9,13 +9,13 @@
 # uvicorn==0.23.2   
 # python-multipart
 # aiofiles
-# Base image provides torch and torchaudio
-# numpy==1.22.0 # <-- Strongly recommend removing this line unless absolutely necessary
+ numpy==1.22.0
+# torch and torchaudio are provided by the base Docker image
 TTS==0.17.2
 transformers==4.35.2
-gradio==3.44.4 # Keep only if serving a Gradio UI from this container
+# gradio removed as it's not used in main.py
 pydub==0.25.1
 fastapi==0.104.1
-uvicorn[standard]==0.23.2 # Using [standard] includes performance extras
+uvicorn[standard]==0.23.2 # Use [standard] for performance gains
 python-multipart
-aiofiles
+aiofiles # Often useful with FastAPI async file operations

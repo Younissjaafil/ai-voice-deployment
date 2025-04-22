@@ -1,0 +1,91 @@
+# name: Build & Publish Docker Image
+
+# on:
+#   push:
+#     branches: [main]
+
+# jobs:
+#   build-push:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Check out code
+#         uses: actions/checkout@v4
+
+#       - name: Log in to Docker Hub
+#         uses: docker/login-action@v2
+#         with:
+#           username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+#       - name: Build and push
+#         uses: docker/build-push-action@v4
+#         with:
+#           context: .
+#           file: ./Dockerfile
+#           push: true
+#           tags: ${{ secrets.DOCKERHUB_USERNAME }}/xtts-api:latest
+# .github/workflows/deploy.yml
+name: Deploy to RunPod Serverless
+
+on:
+  push:
+    branches:
+      - main # Or your deployment branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub Actions
+
+      - name: Build and push Docker image
+        id: build-push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }} # Tag with commit SHA
+          # Optional: Add 'latest' tag for easier reference, but SHA is more precise
+          # tags: |
+          #   ghcr.io/${{ github.repository }}:${{ github.sha }}
+          #   ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trigger RunPod Serverless Deployment
+        run: |
+          IMAGE_NAME="ghcr.io/${{ github.repository }}:${{ github.sha }}"
+          echo "Deploying image: $IMAGE_NAME to RunPod Endpoint ID: ${{ secrets.RUNPOD_ENDPOINT_ID }}"
+
+          curl --request POST \
+               --url https://api.runpod.io/v2/${{ secrets.RUNPOD_ENDPOINT_ID }}/deploy \
+               --header 'accept: application/json' \
+               --header 'content-type: application/json' \
+               --header 'authorization: ${{ secrets.RUNPOD_API_KEY }}' \
+               --data "{
+                 \"input\": {
+                   \"image_name\": \"$IMAGE_NAME\"
+                 }
+               }"
+
+        # Optional: Add error handling for the curl command
+        # if [ $? -ne 0 ]; then
+        #   echo "RunPod deployment trigger failed!"
+        #   exit 1
+        # fi
+        # echo "RunPod deployment triggered successfully."
